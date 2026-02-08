@@ -164,8 +164,8 @@ You can use n8n expressions in the KQL Query field:
 ### Build
 
 ```bash
-git clone https://github.com/your-org/n8n-nodes-kusto.git
-cd n8n-nodes-kusto
+git clone https://github.com/sergey-goncharenko/n8n-community-kusto.git
+cd n8n-community-kusto
 npm install
 npm run build
 ```

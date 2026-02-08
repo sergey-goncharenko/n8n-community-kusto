@@ -11,14 +11,14 @@
     "azure"
   ],
   "license": "MIT",
-  "homepage": "https://github.com/your-org/n8n-nodes-kusto",
+  "homepage": "https://github.com/sergey-goncharenko/n8n-community-kusto",
   "author": {
-    "name": "Your Name",
-    "email": "you@example.com"
+    "name": "Sergey Goncharenko",
+    "url": "https://github.com/sergey-goncharenko"
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/your-org/n8n-nodes-kusto.git"
+    "url": "https://github.com/sergey-goncharenko/n8n-community-kusto.git"
   },
   "main": "index.js",
   "scripts": {
