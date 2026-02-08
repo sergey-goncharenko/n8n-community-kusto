@@ -42,6 +42,7 @@ export class KustoQuery implements INodeType {
 		defaults: {
 			name: 'Kusto Query',
 		},
+		usableAsTool: true,
 		inputs: ['main'],
 		outputs: ['main'],
 		credentials: [
