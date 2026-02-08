@@ -23,6 +23,7 @@
   "main": "index.js",
   "scripts": {
     "build": "tsc && gulp build:icons",
+    "prepare": "npm run build",
     "dev": "tsc --watch",
     "format": "prettier --write \"nodes/**/*.ts\" \"credentials/**/*.ts\"",
     "lint": "eslint nodes credentials --ext .ts",
@@ -30,7 +31,8 @@
     "prepublishOnly": "npm run build"
   },
   "files": [
-    "dist"
+    "dist",
+    "index.js"
   ],
   "n8n": {
     "n8nNodesApiVersion": 1,
