@@ -59,7 +59,7 @@ jobs:
           PKG_VERSION=$(node -p "require('./package.json').version")
           echo "name=$PKG_NAME" >> "$GITHUB_OUTPUT"
           echo "version=$PKG_VERSION" >> "$GITHUB_OUTPUT"
-          if npm view "$PKG_NAME@$PKG_VERSION" version 2>/dev/null; then
+          if npm view "$PKG_NAME@$PKG_VERSION" version > /dev/null 2>&1; then
             echo "exists=true" >> "$GITHUB_OUTPUT"
             echo "Version $PKG_VERSION already published — skipping."
           else
