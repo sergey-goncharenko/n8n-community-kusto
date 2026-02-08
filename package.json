@@ -1,0 +1,62 @@
+{
+  "name": "n8n-nodes-kusto",
+  "version": "0.1.0",
+  "description": "N8N community node for running Azure Data Explorer (Kusto) KQL queries via the REST API.",
+  "keywords": [
+    "n8n-community-node-package",
+    "n8n",
+    "kusto",
+    "azure-data-explorer",
+    "kql",
+    "azure"
+  ],
+  "license": "MIT",
+  "homepage": "https://github.com/your-org/n8n-nodes-kusto",
+  "author": {
+    "name": "Your Name",
+    "email": "you@example.com"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/your-org/n8n-nodes-kusto.git"
+  },
+  "main": "index.js",
+  "scripts": {
+    "build": "tsc && gulp build:icons",
+    "dev": "tsc --watch",
+    "format": "prettier --write \"nodes/**/*.ts\" \"credentials/**/*.ts\"",
+    "lint": "eslint nodes credentials --ext .ts",
+    "lintfix": "eslint nodes credentials --ext .ts --fix",
+    "prepublishOnly": "npm run build"
+  },
+  "files": [
+    "dist"
+  ],
+  "n8n": {
+    "n8nNodesApiVersion": 1,
+    "credentials": [
+      "dist/credentials/KustoApi.credentials.js"
+    ],
+    "nodes": [
+      "dist/nodes/KustoQuery/KustoQuery.node.js"
+    ]
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "@typescript-eslint/eslint-plugin": "^7.0.0",
+    "@typescript-eslint/parser": "^7.0.0",
+    "eslint": "^8.56.0",
+    "eslint-plugin-n8n-nodes-base": "^1.16.0",
+    "gulp": "^4.0.2",
+    "gulp-filter": "^9.0.1",
+    "n8n-workflow": "^1.27.0",
+    "prettier": "^3.2.0",
+    "typescript": "^5.3.0"
+  },
+  "peerDependencies": {
+    "n8n-workflow": "*"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
