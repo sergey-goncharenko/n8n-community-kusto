@@ -1,16 +1,13 @@
-name: Build & Deploy to Raspberry Pi
+name: Build & Publish to npm
 
 on:
   push:
     branches: [main]
-  workflow_dispatch:  # Allow manual trigger from GitHub UI
-
-env:
-  N8N_CONTAINER: ${{ secrets.PI_N8N_CONTAINER_NAME || 'n8n' }}
+  workflow_dispatch:
 
 jobs:
   build:
-    name: Build package
+    name: Build & Lint
     runs-on: ubuntu-latest
 
     steps:
@@ -32,68 +29,48 @@ jobs:
       - name: Build
         run: npm run build
 
-      - name: Package tarball
-        run: npm pack
-
-      - name: Upload tarball artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: n8n-nodes-kusto-package
-          path: n8n-nodes-kusto-*.tgz
-          retention-days: 30
-
-  deploy:
-    name: Deploy to Raspberry Pi
+  publish:
+    name: Publish to npm
     needs: build
     runs-on: ubuntu-latest
-    # Only deploy on push to main (not on PRs)
-    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    if: github.ref == 'refs/heads/main'
 
     steps:
-      - name: Download tarball artifact
-        uses: actions/download-artifact@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
         with:
-          name: n8n-nodes-kusto-package
+          node-version: '20'
+          cache: 'npm'
+          registry-url: 'https://registry.npmjs.org'
 
-      - name: Get tarball filename
-        id: tarball
-        run: echo "filename=$(ls n8n-nodes-kusto-*.tgz)" >> "$GITHUB_OUTPUT"
+      - name: Install dependencies
+        run: npm ci
 
-      - name: Copy tarball to Raspberry Pi
-        uses: appleboy/scp-action@v0.1.7
-        with:
-          host: ${{ secrets.PI_HOST }}
-          username: ${{ secrets.PI_USER }}
-          key: ${{ secrets.PI_SSH_KEY }}
-          port: ${{ secrets.PI_SSH_PORT || '22' }}
-          source: ${{ steps.tarball.outputs.filename }}
-          target: /tmp/
+      - name: Build
+        run: npm run build
 
-      - name: Install into n8n container and restart
-        uses: appleboy/ssh-action@v1.0.3
-        with:
-          host: ${{ secrets.PI_HOST }}
-          username: ${{ secrets.PI_USER }}
-          key: ${{ secrets.PI_SSH_KEY }}
-          port: ${{ secrets.PI_SSH_PORT || '22' }}
-          script: |
-            CONTAINER="${{ secrets.PI_N8N_CONTAINER_NAME }}"
-            CONTAINER="${CONTAINER:-n8n}"
-            TARBALL="/tmp/${{ steps.tarball.outputs.filename }}"
+      - name: Check if version already published
+        id: check
+        run: |
+          PKG_NAME=$(node -p "require('./package.json').name")
+          PKG_VERSION=$(node -p "require('./package.json').version")
+          echo "name=$PKG_NAME" >> "$GITHUB_OUTPUT"
+          echo "version=$PKG_VERSION" >> "$GITHUB_OUTPUT"
+          if npm view "$PKG_NAME@$PKG_VERSION" version 2>/dev/null; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+            echo "Version $PKG_VERSION already published — skipping."
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+            echo "Version $PKG_VERSION not found on npm — will publish."
+          fi
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
-            echo "==> Copying tarball into container: $CONTAINER"
-            docker cp "$TARBALL" "$CONTAINER":/tmp/n8n-nodes-kusto.tgz
-
-            echo "==> Installing package inside container"
-            docker exec "$CONTAINER" sh -c "cd /home/node/.n8n && npm install /tmp/n8n-nodes-kusto.tgz --save"
-
-            echo "==> Cleaning up tarball inside container"
-            docker exec "$CONTAINER" rm -f /tmp/n8n-nodes-kusto.tgz
-
-            echo "==> Restarting n8n container"
-            docker restart "$CONTAINER"
-
-            echo "==> Cleaning up tarball on host"
-            rm -f "$TARBALL"
-
-            echo "==> Deployment complete!"
+      - name: Publish
+        if: steps.check.outputs.exists == 'false'
+        run: npm publish --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

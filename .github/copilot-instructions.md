@@ -7,7 +7,7 @@ This is an **n8n community node** package (`n8n-nodes-kusto`) that provides a
 
 - **Package name**: `n8n-nodes-kusto`
 - **Repo**: `https://github.com/sergey-goncharenko/n8n-community-kusto`
-- **Runtime**: n8n (self-hosted in Docker on Raspberry Pi)
+- **Runtime**: n8n (installed as a community node via npm)
 - **Language**: TypeScript, compiled to CommonJS
 
 ---
@@ -18,7 +18,7 @@ This is an **n8n community node** package (`n8n-nodes-kusto`) that provides a
 n8n-nodes-kusto/
 ├── .github/
 │   └── workflows/
-│       └── deploy.yml              # CI/CD: build → deploy to Raspberry Pi
+│       └── deploy.yml              # CI/CD: build → publish to npm
 ├── credentials/
 │   └── KustoApi.credentials.ts     # n8n credential type (tenantId, clientId, clientSecret)
 ├── nodes/
@@ -77,11 +77,10 @@ npm pack           # Creates n8n-nodes-kusto-0.1.0.tgz
 
 ### Deploy
 Push to `main` branch → GitHub Actions automatically:
-1. Builds the project
-2. Creates the tarball
-3. SCPs it to the Raspberry Pi
-4. Installs it inside the n8n Docker container
-5. Restarts the container
+1. Builds and lints the project
+2. Checks if the current version is already on npm
+3. If not, publishes to npm with `--access public`
+4. In n8n: **Settings → Community Nodes → Install → `n8n-nodes-kusto`**
 
 ---
 
@@ -91,16 +90,21 @@ The pipeline is defined in `.github/workflows/deploy.yml`.
 
 ### Required GitHub Secrets
 
-| Secret | Description | Example |
-|--------|-------------|---------|
-| `PI_HOST` | Raspberry Pi IP or hostname | `192.168.1.100` |
-| `PI_USER` | SSH username | `pi` |
-| `PI_SSH_KEY` | Private SSH key (full PEM content) | `-----BEGIN OPENSSH PRIVATE KEY-----...` |
-| `PI_SSH_PORT` | SSH port (optional, defaults to 22) | `22` |
-| `PI_N8N_CONTAINER_NAME` | Docker container name (optional, defaults to "n8n") | `n8n` |
+| Secret | Description | How to get it |
+|--------|-------------|---------------|
+| `NPM_TOKEN` | npm access token for publishing | [npmjs.com → Access Tokens → Generate](https://www.npmjs.com/settings/~/tokens) |
 
-**⚠️ NEVER commit credentials, SSH keys, or secrets to the repository.**
+**⚠️ NEVER commit tokens or secrets to the repository.**
 All secrets are stored in GitHub → Settings → Secrets and variables → Actions.
+
+### Installing in n8n
+
+Once the package is published to npm, install it from the n8n UI:
+1. Open your n8n instance
+2. Go to **Settings → Community Nodes**
+3. Click **Install a community node**
+4. Enter `n8n-nodes-kusto` and click **Install**
+5. The **Kusto Query** node will appear in the node panel
 
 ---
 
