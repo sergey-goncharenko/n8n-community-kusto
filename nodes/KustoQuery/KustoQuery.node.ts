@@ -202,21 +202,17 @@ export class KustoQuery implements INodeType {
 		let accessTokenValue: string;
 
 		if (authentication === 'oAuth2') {
-			// OAuth2: n8n manages the token lifecycle (including refresh)
+			// OAuth2: n8n manages the token lifecycle (including refresh) via its
+			// authenticated request helpers (e.g. requestWithAuthentication).
+			// We only validate that credentials are present here; actual HTTP calls
+			// should use this.helpers.requestWithAuthentication('kustoOAuth2Api', …)
+			// so that token refresh is handled automatically.
 			const oAuth2Credentials = await this.getCredentials('kustoOAuth2Api');
 			if (!oAuth2Credentials) {
 				throw new NodeOperationError(this.getNode(), 'No OAuth2 credentials provided.');
 			}
-			const oauthTokenData = oAuth2Credentials.oauthTokenData as {
-				access_token?: string;
-			};
-			if (!oauthTokenData?.access_token) {
-				throw new NodeOperationError(
-					this.getNode(),
-					'OAuth2 token is missing. Please reconnect your credentials.',
-				);
-			}
-			accessTokenValue = oauthTokenData.access_token;
+			// Do not read oauthTokenData.access_token directly here to avoid
+			// bypassing n8n’s OAuth2 token refresh mechanism.
 		} else {
 			// Service Principal: manual client_credentials flow
 			const credentials = await this.getCredentials('kustoApi');
