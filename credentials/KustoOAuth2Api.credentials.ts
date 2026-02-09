@@ -68,7 +68,7 @@ export class KustoOAuth2Api implements ICredentialType {
 			name: 'scope',
 			type: 'hidden',
 			default:
-				'={{$self["clusterUrl"]}}/.default offline_access',
+				'={{$self["clusterUrl"]}}/.default{{$self["grantType"] === "authorizationCode" ? " offline_access" : ""}}',
 		},
 		{
 			displayName: 'Auth URI Query Parameters',
