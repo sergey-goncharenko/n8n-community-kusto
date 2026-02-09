@@ -1,8 +1,10 @@
 # n8n-nodes-kusto
 
+[![npm version](https://img.shields.io/npm/v/n8n-nodes-kusto.svg)](https://www.npmjs.com/package/n8n-nodes-kusto)
 ![n8n community node](https://img.shields.io/badge/n8n-community%20node-orange)
 ![license](https://img.shields.io/badge/license-MIT-blue)
-![version](https://img.shields.io/badge/version-0.1.0-green)
+[![contributions welcome](https://img.shields.io/badge/contributions-welcome-brightgreen.svg)](https://github.com/sergey-goncharenko/n8n-community-kusto/issues)
+![AI-assisted](https://img.shields.io/badge/built%20with-AI%20assistance-blueviolet)
 
 This is an [n8n](https://n8n.io/) community node that lets you execute **KQL queries** against [Azure Data Explorer (Kusto)](https://learn.microsoft.com/en-us/azure/data-explorer/) clusters directly from your n8n workflows.
 
@@ -22,6 +24,8 @@ It authenticates via **Azure AD client credentials** (service principal) and cal
 - [Development](#development)
 - [Compatibility](#compatibility)
 - [License](#license)
+- [AI Transparency](#-ai-transparency)
+- [Contributing](#contributing)
 
 ---
 
@@ -206,3 +210,28 @@ npm run lintfix
 ## License
 
 [MIT](LICENSE)
+
+---
+
+## 🤖 AI Transparency
+
+This project was developed with AI-assisted tooling:
+
+- **GitHub Copilot in VS Code** — powered by **Claude Opus 4.6** (Anthropic) for code generation, architecture decisions, and iterative development
+- **GitHub.com Copilot** — for code review, CI/CD pipeline design, and npm publishing workflow
+- **Microsoft Copilot** — for Azure Data Explorer API research and documentation
+
+All AI-generated code was reviewed, tested, and validated by the maintainer against live Azure Data Explorer clusters.
+
+---
+
+## Contributing
+
+Contributions are welcome! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines on:
+
+- Reporting bugs and requesting features
+- Setting up the development environment
+- Submitting pull requests
+- Coding standards and commit conventions
+
+Please read our [Code of Conduct](CODE_OF_CONDUCT.md) before participating.
