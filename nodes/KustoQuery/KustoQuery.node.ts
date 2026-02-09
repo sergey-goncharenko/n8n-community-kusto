@@ -198,22 +198,10 @@ export class KustoQuery implements INodeType {
 
 		const authentication = this.getNodeParameter('authentication', 0) as string;
 
-		// ── Resolve access token based on auth method ──────────────────
-		let accessTokenValue: string;
+		// For Service Principal: acquire bearer token upfront
+		let accessTokenValue: string | undefined;
 
-		if (authentication === 'oAuth2') {
-			// OAuth2: n8n manages the token lifecycle (including refresh) via its
-			// authenticated request helpers (e.g. requestWithAuthentication).
-			// We only validate that credentials are present here; actual HTTP calls
-			// should use this.helpers.requestWithAuthentication('kustoOAuth2Api', …)
-			// so that token refresh is handled automatically.
-			const oAuth2Credentials = await this.getCredentials('kustoOAuth2Api');
-			if (!oAuth2Credentials) {
-				throw new NodeOperationError(this.getNode(), 'No OAuth2 credentials provided.');
-			}
-			// Do not read oauthTokenData.access_token directly here to avoid
-			// bypassing n8n’s OAuth2 token refresh mechanism.
-		} else {
+		if (authentication !== 'oAuth2') {
 			// Service Principal: manual client_credentials flow
 			const credentials = await this.getCredentials('kustoApi');
 			if (!credentials) {
@@ -292,23 +280,48 @@ export class KustoQuery implements INodeType {
 				const endpoint = operation === 'mgmt' ? '/v1/rest/mgmt' : '/v1/rest/query';
 				const requestId = options.clientRequestId || `n8n-kusto;${Date.now()}`;
 
-				const kustoResponse = await this.helpers.httpRequest({
-					method: 'POST',
-					url: `${clusterUrl}${endpoint}`,
-					headers: {
-						'Accept': 'application/json',
-						'Authorization': `Bearer ${accessTokenValue}`,
-						'Content-Type': 'application/json; charset=utf-8',
-						'x-ms-app': 'n8n-nodes-kusto',
-						'x-ms-client-request-id': requestId,
-					},
-					body: {
-						db: database,
-						csl: kqlQuery,
-						properties: JSON.stringify(requestProperties),
-					},
-					json: true,
-				}) as KustoV1Response;
+				const requestBody = {
+					db: database,
+					csl: kqlQuery,
+					properties: JSON.stringify(requestProperties),
+				};
+
+				let kustoResponse: KustoV1Response;
+
+				if (authentication === 'oAuth2') {
+					// OAuth2: let n8n inject the Bearer token and handle refresh
+					kustoResponse = await this.helpers.httpRequestWithAuthentication.call(
+						this,
+						'kustoOAuth2Api',
+						{
+							method: 'POST',
+							url: `${clusterUrl}${endpoint}`,
+							headers: {
+								'Accept': 'application/json',
+								'Content-Type': 'application/json; charset=utf-8',
+								'x-ms-app': 'n8n-nodes-kusto',
+								'x-ms-client-request-id': requestId,
+							},
+							body: requestBody,
+							json: true,
+						},
+					) as KustoV1Response;
+				} else {
+					// Service Principal: use manually acquired token
+					kustoResponse = await this.helpers.httpRequest({
+						method: 'POST',
+						url: `${clusterUrl}${endpoint}`,
+						headers: {
+							'Accept': 'application/json',
+							'Authorization': `Bearer ${accessTokenValue}`,
+							'Content-Type': 'application/json; charset=utf-8',
+							'x-ms-app': 'n8n-nodes-kusto',
+							'x-ms-client-request-id': requestId,
+						},
+						body: requestBody,
+						json: true,
+					}) as KustoV1Response;
+				}
 
 				// ── Parse response into n8n items ──────────────────────
 				if (!kustoResponse?.Tables || kustoResponse.Tables.length === 0) {
