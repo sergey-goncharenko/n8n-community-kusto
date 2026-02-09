@@ -8,7 +8,7 @@
 
 This is an [n8n](https://n8n.io/) community node that lets you execute **KQL queries** against [Azure Data Explorer (Kusto)](https://learn.microsoft.com/en-us/azure/data-explorer/) clusters directly from your n8n workflows.
 
-It authenticates via **Azure AD client credentials** (service principal) and calls the [Kusto REST API](https://learn.microsoft.com/en-us/azure/data-explorer/kusto/api/rest/) to run queries and management commands, returning rows as JSON items.
+It authenticates via **Azure AD service principal** (client credentials) or **OAuth2 Authorization Code** flow and calls the [Kusto REST API](https://learn.microsoft.com/en-us/azure/data-explorer/kusto/api/rest/) to run queries and management commands, returning rows as JSON items.
 
 [n8n](https://n8n.io/) is a [fair-code licensed](https://docs.n8n.io/reference/license/) workflow automation platform.
 
@@ -53,12 +53,18 @@ Then restart your n8n instance.
 ## Prerequisites
 
 1. An **Azure Data Explorer cluster** (e.g. `https://mycluster.westeurope.kusto.windows.net`)
-2. An **Azure AD (Entra ID) App Registration** with:
+2. **One** of the following authentication methods:
+
+### Option A: Service Principal (Client Credentials)
+
+Best for **server-to-server** automation where no interactive sign-in is needed.
+
+1. An **Azure AD (Entra ID) App Registration** with:
    - A client secret
    - Permissions granted on the Kusto cluster (viewer / admin role)
-3. The **tenant ID**, **client ID**, and **client secret** from the app registration
+2. The **tenant ID**, **client ID**, and **client secret** from the app registration
 
-### Setting up Azure AD credentials
+#### Setting up Service Principal credentials
 
 1. Go to [Azure Portal → App registrations](https://portal.azure.com/#blade/Microsoft_AAD_RegisteredApps/ApplicationsListBlade)
 2. Register a new application (or use an existing one)
@@ -69,17 +75,43 @@ Then restart your n8n instance.
    ```
 5. Note your **Tenant ID** (from Azure AD overview), **Client ID** (from app overview), and the **Client Secret** value
 
+### Option B: OAuth2 Authorization Code
+
+Best for **interactive / cross-tenant** scenarios where the user signs in via browser.
+
+1. An **Azure AD (Entra ID) App Registration** with:
+   - A **Web** redirect URI: `https://<your-n8n-host>/rest/oauth2-credential/callback`
+   - API permissions: `Azure Data Explorer` → `user_impersonation` (delegated)
+   - For **multi-tenant** access: set the app to _Accounts in any organizational directory_
+2. The **tenant ID** (or `common` / `organizations` for multi-tenant), **client ID**, and **client secret**
+
 ---
 
 ## Credentials
 
-When adding credentials in n8n, select **Kusto API** and provide:
+### Kusto API (Service Principal)
+
+Select **Authentication Type** → **Service Principal** in the node, then add **Kusto API** credentials:
 
 | Field           | Description                                                  |
 | --------------- | ------------------------------------------------------------ |
 | **Tenant ID**   | Azure AD (Entra ID) tenant ID (GUID)                        |
 | **Client ID**   | Azure AD application (client) ID (GUID)                     |
 | **Client Secret** | Azure AD application client secret (stored securely)       |
+
+### Kusto OAuth2 API
+
+Select **Authentication Type** → **OAuth2** in the node, then add **Kusto OAuth2 API** credentials:
+
+| Field           | Description                                                  |
+| --------------- | ------------------------------------------------------------ |
+| **Tenant ID**   | Azure AD tenant ID — use `common` or `organizations` for multi-tenant (default: `common`) |
+| **Cluster URL** | Azure Data Explorer cluster URL — used to scope the access token |
+| **Grant Type**  | `Authorization Code` (interactive sign-in) or `Client Credentials` (app-only) |
+| **Client ID**   | Azure AD application (client) ID                            |
+| **Client Secret** | Azure AD application client secret                         |
+
+After saving, click **Connect** (for Authorization Code) to sign in via the browser. n8n manages token refresh automatically.
 
 ---
 
@@ -96,11 +128,12 @@ When adding credentials in n8n, select **Kusto API** and provide:
 
 **Parameters:**
 
-| Parameter        | Type     | Required | Description                                          |
-| ---------------- | -------- | -------- | ---------------------------------------------------- |
-| Cluster URL      | string   | ✅       | Azure Data Explorer cluster endpoint URL             |
-| Database         | string   | ✅       | Target database name                                 |
-| KQL Query        | string   | ✅       | The KQL query or management command to execute       |
+| Parameter            | Type     | Required | Description                                          |
+| -------------------- | -------- | -------- | ---------------------------------------------------- |
+| Authentication Type  | select   | ✅       | `Service Principal` or `OAuth2`                      |
+| Cluster URL          | string   | ✅       | Azure Data Explorer cluster endpoint URL             |
+| Database             | string   | ✅       | Target database name                                 |
+| KQL Query            | string   | ✅       | The KQL query or management command to execute       |
 
 **Options:**
 

@@ -47,11 +47,45 @@ export class KustoQuery implements INodeType {
 		outputs: ['main'],
 		credentials: [
 			{
-				name: 'kustoApi',
+				name: 'kustoOAuth2Api',
+				displayName: 'Kusto OAuth2 API',
 				required: true,
+				displayOptions: {
+					show: {
+						authentication: ['oAuth2'],
+					},
+				},
+			},
+			{
+				name: 'kustoApi',
+				displayName: 'Kusto Service Principal',
+				required: true,
+				displayOptions: {
+					show: {
+						authentication: ['servicePrincipal'],
+					},
+				},
 			},
 		],
 		properties: [
+			{
+				displayName: 'Authentication',
+				name: 'authentication',
+				type: 'options',
+				options: [
+					{
+						name: 'OAuth2 (Recommended)',
+						value: 'oAuth2',
+						description: 'Sign in via browser — works cross-tenant',
+					},
+					{
+						name: 'Service Principal',
+						value: 'servicePrincipal',
+						description: 'Client credentials — headless automation',
+					},
+				],
+				default: 'servicePrincipal',
+			},
 			{
 				displayName: 'Operation',
 				name: 'operation',
@@ -162,14 +196,60 @@ export class KustoQuery implements INodeType {
 		const items = this.getInputData();
 		const returnData: INodeExecutionData[] = [];
 
-		const credentials = await this.getCredentials('kustoApi');
-		if (!credentials) {
-			throw new NodeOperationError(this.getNode(), 'No credentials provided for Kusto API.');
-		}
+		const authentication = this.getNodeParameter('authentication', 0) as string;
 
-		const tenantId = credentials.tenantId as string;
-		const clientId = credentials.clientId as string;
-		const clientSecret = credentials.clientSecret as string;
+		// ── Resolve access token based on auth method ──────────────────
+		let accessTokenValue: string;
+
+		if (authentication === 'oAuth2') {
+			// OAuth2: n8n manages the token lifecycle (including refresh) via its
+			// authenticated request helpers (e.g. requestWithAuthentication).
+			// We only validate that credentials are present here; actual HTTP calls
+			// should use this.helpers.requestWithAuthentication('kustoOAuth2Api', …)
+			// so that token refresh is handled automatically.
+			const oAuth2Credentials = await this.getCredentials('kustoOAuth2Api');
+			if (!oAuth2Credentials) {
+				throw new NodeOperationError(this.getNode(), 'No OAuth2 credentials provided.');
+			}
+			// Do not read oauthTokenData.access_token directly here to avoid
+			// bypassing n8n’s OAuth2 token refresh mechanism.
+		} else {
+			// Service Principal: manual client_credentials flow
+			const credentials = await this.getCredentials('kustoApi');
+			if (!credentials) {
+				throw new NodeOperationError(this.getNode(), 'No credentials provided for Kusto API.');
+			}
+
+			const tenantId = credentials.tenantId as string;
+			const clientId = credentials.clientId as string;
+			const clientSecret = credentials.clientSecret as string;
+
+			// We need the cluster URL for the token resource — grab from first item
+			const firstClusterUrl = (this.getNodeParameter('clusterUrl', 0) as string).replace(/\/+$/, '');
+
+			const tokenResponse = await this.helpers.httpRequest({
+				method: 'POST',
+				url: `https://login.microsoftonline.com/${tenantId}/oauth2/token`,
+				headers: {
+					'Content-Type': 'application/x-www-form-urlencoded',
+				},
+				body: new URLSearchParams({
+					grant_type: 'client_credentials',
+					resource: firstClusterUrl,
+					client_id: clientId,
+					client_secret: clientSecret,
+				}).toString(),
+				json: true,
+			}) as AadTokenResponse;
+
+			if (!tokenResponse?.access_token) {
+				throw new NodeOperationError(
+					this.getNode(),
+					'Failed to obtain Azure AD access token. Check tenant ID, client ID, and client secret.',
+				);
+			}
+			accessTokenValue = tokenResponse.access_token;
+		}
 
 		for (let i = 0; i < items.length; i++) {
 			try {
@@ -193,31 +273,7 @@ export class KustoQuery implements INodeType {
 					throw new NodeOperationError(this.getNode(), 'KQL query is required.', { itemIndex: i });
 				}
 
-				// ── Step 1: Acquire Azure AD bearer token ──────────────────────
-				const accessToken = await this.helpers.httpRequest({
-					method: 'POST',
-					url: `https://login.microsoftonline.com/${tenantId}/oauth2/token`,
-					headers: {
-						'Content-Type': 'application/x-www-form-urlencoded',
-					},
-					body: new URLSearchParams({
-						grant_type: 'client_credentials',
-						resource: clusterUrl,
-						client_id: clientId,
-						client_secret: clientSecret,
-					}).toString(),
-					json: true,
-				}) as AadTokenResponse;
-
-				if (!accessToken?.access_token) {
-					throw new NodeOperationError(
-						this.getNode(),
-						'Failed to obtain Azure AD access token. Check tenant ID, client ID, and client secret.',
-						{ itemIndex: i },
-					);
-				}
-
-				// ── Step 2: Build request properties ───────────────────────────
+				// ── Build request properties ───────────────────────────────
 				const requestProperties: Record<string, any> = {
 					Options: {} as Record<string, any>,
 				};
@@ -232,7 +288,7 @@ export class KustoQuery implements INodeType {
 					requestProperties.Options.ClientRequestId = options.clientRequestId;
 				}
 
-				// ── Step 3: Execute the Kusto query ────────────────────────────
+				// ── Execute the Kusto query ────────────────────────────
 				const endpoint = operation === 'mgmt' ? '/v1/rest/mgmt' : '/v1/rest/query';
 				const requestId = options.clientRequestId || `n8n-kusto;${Date.now()}`;
 
@@ -241,7 +297,7 @@ export class KustoQuery implements INodeType {
 					url: `${clusterUrl}${endpoint}`,
 					headers: {
 						'Accept': 'application/json',
-						'Authorization': `Bearer ${accessToken.access_token}`,
+						'Authorization': `Bearer ${accessTokenValue}`,
 						'Content-Type': 'application/json; charset=utf-8',
 						'x-ms-app': 'n8n-nodes-kusto',
 						'x-ms-client-request-id': requestId,
@@ -254,7 +310,7 @@ export class KustoQuery implements INodeType {
 					json: true,
 				}) as KustoV1Response;
 
-				// ── Step 4: Parse response into n8n items ──────────────────────
+				// ── Parse response into n8n items ──────────────────────
 				if (!kustoResponse?.Tables || kustoResponse.Tables.length === 0) {
 					// Return an empty item so downstream nodes see the execution completed
 					returnData.push({ json: { _info: 'Query returned no tables.' } });
