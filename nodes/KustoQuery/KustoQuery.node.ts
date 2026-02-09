@@ -84,7 +84,7 @@ export class KustoQuery implements INodeType {
 						description: 'Client credentials — headless automation',
 					},
 				],
-				default: 'oAuth2',
+				default: 'servicePrincipal',
 			},
 			{
 				displayName: 'Operation',
