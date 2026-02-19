@@ -355,11 +355,25 @@ export class KustoQuery implements INodeType {
 					returnData.push({ json: jsonItem });
 				}
 			} catch (error: any) {
+				// Extract a meaningful error message from the Kusto response
+				let errorMessage = error.message || error.description || 'Unknown error executing Kusto query';
+
+				// Try to extract detailed Kusto error from response body
+				if (error.response?.body || error.response?.data) {
+					const body = error.response.body || error.response.data;
+					try {
+						const parsed = typeof body === 'string' ? JSON.parse(body) : body;
+						if (parsed?.error?.['@message']) {
+							errorMessage = `KQL Error: ${parsed.error['@message']}`;
+						} else if (parsed?.error?.message) {
+							errorMessage = `KQL Error: ${parsed.error.message}`;
+						}
+					} catch {
+						// If parsing fails, use the raw message
+					}
+				}
+
 				if (this.continueOnFail()) {
-					const errorMessage =
-						error.message ||
-						error.description ||
-						'Unknown error executing Kusto query';
 					returnData.push({
 						json: { error: errorMessage },
 						pairedItem: { item: i },
@@ -371,7 +385,8 @@ export class KustoQuery implements INodeType {
 					throw error;
 				}
 				throw new NodeApiError(this.getNode(), error as any, {
-					message: `Kusto query failed: ${error.message || 'Unknown error'}`,
+					message: `Kusto query failed: ${errorMessage}`,
+					description: errorMessage,
 					itemIndex: i,
 				});
 			}
