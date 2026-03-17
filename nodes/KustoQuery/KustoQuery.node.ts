@@ -337,12 +337,7 @@ export class KustoQuery implements INodeType {
 				const rows = primaryTable.Rows;
 
 				if (!rows || rows.length === 0) {
-					returnData.push({
-						json: {
-							_info: 'Query executed successfully but returned no rows.',
-							_columns: columns.map((c) => c.ColumnName),
-						},
-					});
+					// Empty result set — skip this item (no rows to return)
 					continue;
 				}
 
@@ -380,7 +375,19 @@ export class KustoQuery implements INodeType {
 					});
 					continue;
 				}
-				// Wrap non-NodeApiError errors for proper display in n8n UI
+
+				// When used as an AI tool, return error as output so the agent
+				// can see and react to it instead of crashing the workflow.
+				const nodeDescription = this.getNode()?.type || '';
+				if (nodeDescription.endsWith('Tool')) {
+					returnData.push({
+						json: { error: errorMessage },
+						pairedItem: { item: i },
+					});
+					continue;
+				}
+
+				// Standard node usage: throw for proper display in n8n UI
 				if (error instanceof NodeApiError || error instanceof NodeOperationError) {
 					throw error;
 				}

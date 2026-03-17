@@ -155,3 +155,56 @@ Before releasing a new version:
 1. Update `version` in `package.json`
 2. Update the version badge in `README.md`
 3. Commit and push — CI/CD will deploy automatically
+
+---
+
+## Integration Testing via n8n MCP
+
+The project has two automated test workflows on the n8n instance, triggered
+via webhook. These test the **installed** version of the node (which may lag
+behind the latest code — this is expected and not a release gate).
+
+The workspace has an isolated n8n MCP server configured in `.vscode/mcp.json`
+(`n8n-mcp-kusto`). The n8n instance URL and API key are provided via VS Code
+input prompts — **never hardcode them here**.
+
+### Test Suite (workflow `UOgeqtxFK9eDxukb`)
+
+Webhook path: `GET /webhook/kusto-test-suite`
+
+| Test | What it validates |
+|------|-------------------|
+| Test1: Basic Query | KQL query, row/column parsing |
+| Test2: Mgmt Command | `.show tables` via `/v1/rest/mgmt` endpoint |
+| Test3: Error Handling | KQL syntax error → meaningful error extraction |
+| Test4: Empty Result | Zero-row query → no phantom items |
+| Test5: Options | `serverTimeout`, `noTruncation`, `clientRequestId` |
+| Test6: Trailing Slash | Cluster URL with extra slashes → stripped correctly |
+| Test7: Column Types | String, datetime, dynamic/object type preservation |
+
+Returns: `{ summary, allPassed, passCount, failCount, tests[] }`
+
+### AI Tool Test (workflow `cIyMlIq9fNltuUlW`)
+
+Webhook path: `GET /webhook/kusto-ai-test`
+
+| Test | What it validates |
+|------|-------------------|
+| AI Test 1: Query | AI Agent writes KQL, calls Kusto tool, gets data |
+| AI Test 2: Error Recovery | AI Agent receives KQL error and explains it |
+
+Returns: `{ summary, allPassed, tests[] }`
+
+### Running tests
+
+**Via MCP** (preferred):
+```
+n8n_test_workflow({workflowId: "UOgeqtxFK9eDxukb"})  // test suite
+n8n_test_workflow({workflowId: "cIyMlIq9fNltuUlW"})  // AI tool
+```
+
+**Via curl** (replace `<n8n-host>` with your instance URL):
+```bash
+curl <n8n-host>/webhook/kusto-test-suite
+curl <n8n-host>/webhook/kusto-ai-test
+```
